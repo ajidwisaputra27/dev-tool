@@ -2,7 +2,10 @@ import { DatabaseSync } from 'node:sqlite';
 import path from 'path';
 import fs from 'fs';
 
-const DB_PATH = path.join(process.cwd(), 'data', 'dashboard.db');
+// ponytail: /tmp is erased on cold start; use persistent DB (Neon/PlanetScale) when data must survive redeploys
+const DB_PATH = process.env.VERCEL
+  ? '/tmp/dashboard.db'
+  : path.join(process.cwd(), 'data', 'dashboard.db');
 
 type Statement = ReturnType<DatabaseSync['prepare']>;
 
