@@ -156,7 +156,7 @@ export default function SpotifyPanel({
         </span>
       </div>
 
-      <div className="board-switch" style={{ marginBottom: 12 }}>
+      <div className="spotify-playlist-bar">
         {playlists.map((playlist) => (
           <button
             key={playlist.id}
