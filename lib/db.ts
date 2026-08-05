@@ -1,50 +1,50 @@
-import { DatabaseSync } from 'node:sqlite';
-import path from 'path';
-import fs from 'fs';
+import { DatabaseSync } from "node:sqlite";
+import path from "path";
+import fs from "fs";
 
 // ponytail: /tmp is erased on cold start; use persistent DB (Neon/PlanetScale) when data must survive redeploys
 const DB_PATH = process.env.VERCEL
-  ? '/tmp/dashboard.db'
-  : path.join(process.cwd(), 'data', 'dashboard.db');
+	? "/tmp/dashboard.db"
+	: path.join(process.cwd(), "data", "dashboard.db");
 
-type Statement = ReturnType<DatabaseSync['prepare']>;
+type Statement = ReturnType<DatabaseSync["prepare"]>;
 
 class DatabaseHandle {
-  private readonly db: DatabaseSync;
+	private readonly db: DatabaseSync;
 
-  constructor(filePath: string) {
-    this.db = new DatabaseSync(filePath);
-  }
+	constructor(filePath: string) {
+		this.db = new DatabaseSync(filePath);
+	}
 
-  prepare(sql: string): Statement {
-    return this.db.prepare(sql);
-  }
+	prepare(sql: string): Statement {
+		return this.db.prepare(sql);
+	}
 
-  exec(sql: string) {
-    return this.db.exec(sql);
-  }
+	exec(sql: string) {
+		return this.db.exec(sql);
+	}
 
-  pragma(statement: string) {
-    return this.db.exec(`PRAGMA ${statement}`);
-  }
+	pragma(statement: string) {
+		return this.db.exec(`PRAGMA ${statement}`);
+	}
 
-  transaction<T extends unknown[], R>(callback: (...args: T) => R) {
-    return (...args: T) => {
-      this.exec('BEGIN');
-      try {
-        const result = callback(...args);
-        this.exec('COMMIT');
-        return result;
-      } catch (error) {
-        this.exec('ROLLBACK');
-        throw error;
-      }
-    };
-  }
+	transaction<T extends unknown[], R>(callback: (...args: T) => R) {
+		return (...args: T) => {
+			this.exec("BEGIN");
+			try {
+				const result = callback(...args);
+				this.exec("COMMIT");
+				return result;
+			} catch (error) {
+				this.exec("ROLLBACK");
+				throw error;
+			}
+		};
+	}
 
-  close() {
-    this.db.close();
-  }
+	close() {
+		this.db.close();
+	}
 }
 
 type DatabaseInstance = DatabaseHandle;
@@ -52,12 +52,12 @@ type DatabaseInstance = DatabaseHandle;
 let db: DatabaseInstance | null = null;
 
 function ensureDataDir() {
-  const dir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+	const dir = path.dirname(DB_PATH);
+	if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
 function runMigrations(instance: DatabaseInstance) {
-  instance.exec(`
+	instance.exec(`
     CREATE TABLE IF NOT EXISTS boards (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -114,40 +114,50 @@ function runMigrations(instance: DatabaseInstance) {
     );
   `);
 
-  const playlistColumns = instance.prepare("PRAGMA table_info(spotify_playlists)").all() as Array<{ name: string }>;
-  if (!playlistColumns.some((column) => column.name === 'is_active')) {
-    instance.exec('ALTER TABLE spotify_playlists ADD COLUMN is_active INTEGER DEFAULT 0');
-  }
+	const playlistColumns = instance
+		.prepare("PRAGMA table_info(spotify_playlists)")
+		.all() as Array<{ name: string }>;
+	if (!playlistColumns.some((column) => column.name === "is_active")) {
+		instance.exec(
+			"ALTER TABLE spotify_playlists ADD COLUMN is_active INTEGER DEFAULT 0",
+		);
+	}
 
-  const boardCountResult = instance.prepare('SELECT COUNT(*) AS c FROM boards').get() as { c: number } | undefined;
-  const boardCount = boardCountResult?.c ?? 0;
-  if (boardCount === 0) {
-    const info = instance.prepare('INSERT INTO boards (name) VALUES (?)').run('main');
-    instance.prepare('INSERT INTO notes (board_id, content) VALUES (?, ?)').run(info.lastInsertRowid, '');
-  }
+	const boardCountResult = instance
+		.prepare("SELECT COUNT(*) AS c FROM boards")
+		.get() as { c: number } | undefined;
+	const boardCount = boardCountResult?.c ?? 0;
+	if (boardCount === 0) {
+		const info = instance
+			.prepare("INSERT INTO boards (name) VALUES (?)")
+			.run("main");
+		instance
+			.prepare("INSERT INTO notes (board_id, content) VALUES (?, ?)")
+			.run(info.lastInsertRowid, "");
+	}
 }
 
 function open() {
-  ensureDataDir();
-  const instance = new DatabaseHandle(DB_PATH);
-  instance.pragma('journal_mode = WAL');
-  instance.pragma('foreign_keys = ON');
-  runMigrations(instance);
-  return instance;
+	ensureDataDir();
+	const instance = new DatabaseHandle(DB_PATH);
+	instance.pragma("journal_mode = WAL");
+	instance.pragma("foreign_keys = ON");
+	runMigrations(instance);
+	return instance;
 }
 
 export default function getDb() {
-  if (!db) db = open();
-  return db;
+	if (!db) db = open();
+	return db;
 }
 
 export function closeDb() {
-  if (db) {
-    db.close();
-    db = null;
-  }
+	if (db) {
+		db.close();
+		db = null;
+	}
 }
 
 export function DB_FILE_PATH() {
-  return DB_PATH;
+	return DB_PATH;
 }
