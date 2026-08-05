@@ -49,8 +49,8 @@ export default function DataManager({ onImported }: DataManagerProps) {
 
 	return (
 		<div className="data-manager">
-			<button onClick={exportDb}>↓ export</button>
-			<label htmlFor="import-file">↑ import</label>
+			<button onClick={exportDb}>↓ backup</button>
+			<label htmlFor="import-file">↑ restore</label>
 			<input
 				id="import-file"
 				ref={fileInputRef}
