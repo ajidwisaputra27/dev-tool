@@ -1,4 +1,4 @@
-import getDb from "@/lib/db";
+import { initDb, query, batch } from "@/lib/turso";
 
 export const BACKUP_VERSION = 1 as const;
 
