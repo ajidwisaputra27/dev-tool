@@ -51,10 +51,14 @@ export default function SpotifyPanel({
 		initialLink ? parseSpotifyLink(initialLink) : null,
 	);
 	const [error, setError] = useState("");
-	const [internalPlaylists, setInternalPlaylists] = useState<SpotifyPlaylist[]>([]);
+	const [internalPlaylists, setInternalPlaylists] = useState<SpotifyPlaylist[]>(
+		[],
+	);
 	const playlists = externalPlaylists ?? internalPlaylists;
-	function setPlaylists(data: SpotifyPlaylist[] | ((prev: SpotifyPlaylist[]) => SpotifyPlaylist[])) {
-		const next = typeof data === 'function' ? data(playlists) : data;
+	function setPlaylists(
+		data: SpotifyPlaylist[] | ((prev: SpotifyPlaylist[]) => SpotifyPlaylist[]),
+	) {
+		const next = typeof data === "function" ? data(playlists) : data;
 		setInternalPlaylists(next);
 		onPlaylistsChange?.(next);
 	}
@@ -78,7 +82,7 @@ export default function SpotifyPanel({
 			.then((r) => r.json())
 			.then((data: SpotifyPlaylist[]) => setPlaylists(data))
 			.catch(() => setError("gagal memuat playlist."));
-	// eslint-disable-next-line react-hooks/exhaustive-deps
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
 	// sync external activePlaylistId
