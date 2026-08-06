@@ -274,6 +274,7 @@ export default function Dashboard() {
 	const [notesContent, setNotesContent] = useState("");
 	const [settings, setSettings] = useState<SettingsMap>({});
 	const [sessions, setSessions] = useState<PomodoroSession[]>([]);
+	const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
 	const [currentPlaylistId, setCurrentPlaylistId] = useState<number | null>(
 		null,
 	);
@@ -307,6 +308,7 @@ export default function Dashboard() {
 		setBoards(boardsRes);
 		setSettings(settingsRes);
 		setSessions(sessionsRes);
+		setPlaylists(playlistsRes);
 		if (settingsRes.theme) setTheme(settingsRes.theme as Theme);
 		const activePlaylist = playlistsRes.find((playlist) => playlist.is_active);
 		if (activePlaylist) {
@@ -833,6 +835,8 @@ export default function Dashboard() {
 					<SpotifyPanel
 						initialLink={settings.spotifyLink || ""}
 						activePlaylistId={currentPlaylistId}
+						playlists={playlists}
+						onPlaylistsChange={setPlaylists}
 						onSelectPlaylist={selectSpotifyPlaylist}
 						onSaveLink={saveSpotifyLink}
 					/>

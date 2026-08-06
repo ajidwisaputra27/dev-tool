@@ -31,6 +31,8 @@ function parseSpotifyLink(raw: string) {
 interface SpotifyPanelProps {
 	initialLink?: string;
 	activePlaylistId?: number | null;
+	playlists?: SpotifyPlaylist[];
+	onPlaylistsChange?: (playlists: SpotifyPlaylist[]) => void;
 	onSelectPlaylist?: (playlist: SpotifyPlaylist) => void;
 	onSaveLink?: (link: string) => void;
 }
@@ -40,6 +42,8 @@ type ModalMode = "add" | "edit";
 export default function SpotifyPanel({
 	initialLink = "",
 	activePlaylistId = null,
+	playlists: externalPlaylists,
+	onPlaylistsChange,
 	onSelectPlaylist,
 	onSaveLink,
 }: SpotifyPanelProps) {
@@ -47,7 +51,13 @@ export default function SpotifyPanel({
 		initialLink ? parseSpotifyLink(initialLink) : null,
 	);
 	const [error, setError] = useState("");
-	const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
+	const [internalPlaylists, setInternalPlaylists] = useState<SpotifyPlaylist[]>([]);
+	const playlists = externalPlaylists ?? internalPlaylists;
+	function setPlaylists(data: SpotifyPlaylist[] | ((prev: SpotifyPlaylist[]) => SpotifyPlaylist[])) {
+		const next = typeof data === 'function' ? data(playlists) : data;
+		setInternalPlaylists(next);
+		onPlaylistsChange?.(next);
+	}
 	const [activeId, setActiveId] = useState<number | null>(activePlaylistId);
 
 	// modal
@@ -63,10 +73,12 @@ export default function SpotifyPanel({
 	const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
+		if (externalPlaylists) return; // controlled from parent
 		fetch("/api/playlists")
 			.then((r) => r.json())
 			.then((data: SpotifyPlaylist[]) => setPlaylists(data))
 			.catch(() => setError("gagal memuat playlist."));
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
 	// sync external activePlaylistId
