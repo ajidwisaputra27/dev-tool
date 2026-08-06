@@ -124,7 +124,7 @@ export function importBackup(input: unknown) {
   const insertNote = db.prepare('INSERT INTO notes (board_id, content) VALUES (?, ?)');
   const insertPomodoro = db.prepare('INSERT INTO pomodoro_sessions (id, type, duration_seconds, completed_at) VALUES (?, ?, ?, ?)');
   const insertSetting = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)');
-  const insertPlaylist = db.prepare('INSERT INTO spotify_playlists (id, name, link, created_at) VALUES (?, ?, ?, ?)');
+  const insertPlaylist = db.prepare('INSERT INTO spotify_playlists (id, name, link, is_active, created_at) VALUES (?, ?, ?, ?, ?)');
 
   const txn = db.transaction((data: BackupSnapshot) => {
     db.exec(`
