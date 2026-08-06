@@ -1,20 +1,25 @@
-import { NextResponse } from 'next/server';
-import getDb from '@/lib/db';
+import { NextResponse } from "next/server";
+import { initDb, query, run } from "@/lib/turso";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const db = getDb();
-  const boards = db.prepare('SELECT * FROM boards ORDER BY id').all();
-  return NextResponse.json(boards);
+	await initDb();
+	const boards = await query("SELECT * FROM boards ORDER BY id");
+	return NextResponse.json(boards);
 }
 
 export async function POST(req) {
-  const db = getDb();
-  const body = await req.json();
-  const name = (body.name || 'new board').trim() || 'new board';
-  const info = db.prepare('INSERT INTO boards (name) VALUES (?)').run(name);
-  db.prepare('INSERT INTO notes (board_id, content) VALUES (?, ?)').run(info.lastInsertRowid, '');
-  const board = db.prepare('SELECT * FROM boards WHERE id = ?').get(info.lastInsertRowid);
-  return NextResponse.json(board);
+	await initDb();
+	const body = await req.json();
+	const name = (body.name || "new board").trim() || "new board";
+	const info = await run("INSERT INTO boards (name) VALUES (?)", [name]);
+	await run("INSERT INTO notes (board_id, content) VALUES (?, ?)", [
+		info.lastInsertRowid,
+		"",
+	]);
+	const [board] = await query("SELECT * FROM boards WHERE id = ?", [
+		info.lastInsertRowid,
+	]);
+	return NextResponse.json(board);
 }

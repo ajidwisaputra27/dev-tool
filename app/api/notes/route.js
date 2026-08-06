@@ -1,22 +1,25 @@
-import { NextResponse } from 'next/server';
-import getDb from '@/lib/db';
+import { NextResponse } from "next/server";
+import { initDb, query, run } from "@/lib/turso";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function GET(req) {
-  const db = getDb();
-  const { searchParams } = new URL(req.url);
-  const boardId = searchParams.get('boardId');
-  const row = db.prepare('SELECT * FROM notes WHERE board_id = ?').get(boardId);
-  return NextResponse.json(row || { board_id: Number(boardId), content: '' });
+	await initDb();
+	const { searchParams } = new URL(req.url);
+	const boardId = searchParams.get("boardId");
+	const [row] = await query("SELECT * FROM notes WHERE board_id = ?", [
+		boardId,
+	]);
+	return NextResponse.json(row || { board_id: Number(boardId), content: "" });
 }
 
 export async function PUT(req) {
-  const db = getDb();
-  const { boardId, content } = await req.json();
-  db.prepare(
-    `INSERT INTO notes (board_id, content) VALUES (?, ?)
-     ON CONFLICT(board_id) DO UPDATE SET content = excluded.content`
-  ).run(boardId, content);
-  return NextResponse.json({ ok: true });
+	await initDb();
+	const { boardId, content } = await req.json();
+	await run(
+		`INSERT INTO notes (board_id, content) VALUES (?, ?)
+     ON CONFLICT(board_id) DO UPDATE SET content = excluded.content`,
+		[boardId, content],
+	);
+	return NextResponse.json({ ok: true });
 }

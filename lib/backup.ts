@@ -120,72 +120,55 @@ function normalizeSnapshot(input: unknown): BackupSnapshot {
 	};
 }
 
-export function exportBackup(): BackupSnapshot {
-	const db = getDb();
+export async function exportBackup(): Promise<BackupSnapshot> {
+	await initDb();
 	return {
 		version: BACKUP_VERSION,
 		exportedAt: new Date().toISOString(),
-		boards: db.prepare("SELECT * FROM boards ORDER BY id").all() as Row[],
-		tasks: db.prepare("SELECT * FROM tasks ORDER BY id").all() as Row[],
-		subtasks: db.prepare("SELECT * FROM subtasks ORDER BY id").all() as Row[],
-		notes: db.prepare("SELECT * FROM notes ORDER BY board_id").all() as Row[],
-		pomodoroSessions: db
-			.prepare("SELECT * FROM pomodoro_sessions ORDER BY id")
-			.all() as Row[],
-		settings: db.prepare("SELECT * FROM settings ORDER BY key").all() as Row[],
-		spotifyPlaylists: db
-			.prepare("SELECT * FROM spotify_playlists ORDER BY id")
-			.all() as Row[],
+		boards: (await query("SELECT * FROM boards ORDER BY id")) as Row[],
+		tasks: (await query("SELECT * FROM tasks ORDER BY id")) as Row[],
+		subtasks: (await query("SELECT * FROM subtasks ORDER BY id")) as Row[],
+		notes: (await query("SELECT * FROM notes ORDER BY board_id")) as Row[],
+		pomodoroSessions: (await query(
+			"SELECT * FROM pomodoro_sessions ORDER BY id",
+		)) as Row[],
+		settings: (await query("SELECT * FROM settings ORDER BY key")) as Row[],
+		spotifyPlaylists: (await query(
+			"SELECT * FROM spotify_playlists ORDER BY id",
+		)) as Row[],
 	};
 }
 
-export function importBackup(input: unknown) {
+export async function importBackup(input: unknown) {
 	const snapshot = normalizeSnapshot(input);
-	const db = getDb();
-	const insertBoard = db.prepare(
-		"INSERT INTO boards (id, name, created_at) VALUES (?, ?, ?)",
-	);
-	const insertTask = db.prepare(
-		"INSERT INTO tasks (id, board_id, text, tag, priority, due, estimate, status, git_link, position, created_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-	);
-	const insertSubtask = db.prepare(
-		"INSERT INTO subtasks (id, task_id, text, done) VALUES (?, ?, ?, ?)",
-	);
-	const insertNote = db.prepare(
-		"INSERT INTO notes (board_id, content) VALUES (?, ?)",
-	);
-	const insertPomodoro = db.prepare(
-		"INSERT INTO pomodoro_sessions (id, type, duration_seconds, completed_at) VALUES (?, ?, ?, ?)",
-	);
-	const insertSetting = db.prepare(
-		"INSERT INTO settings (key, value) VALUES (?, ?)",
-	);
-	const insertPlaylist = db.prepare(
-		"INSERT INTO spotify_playlists (id, name, link, is_active, created_at) VALUES (?, ?, ?, ?, ?)",
-	);
+	await initDb();
 
-	const txn = db.transaction((data: BackupSnapshot) => {
-		db.exec(`
-      DELETE FROM subtasks;
-      DELETE FROM tasks;
-      DELETE FROM notes;
-      DELETE FROM pomodoro_sessions;
-      DELETE FROM settings;
-      DELETE FROM spotify_playlists;
-      DELETE FROM boards;
-      DELETE FROM sqlite_sequence;
-    `);
+	const stmts: Array<{ sql: string; args?: any[] }> = [
+		{ sql: "DELETE FROM subtasks" },
+		{ sql: "DELETE FROM tasks" },
+		{ sql: "DELETE FROM notes" },
+		{ sql: "DELETE FROM pomodoro_sessions" },
+		{ sql: "DELETE FROM settings" },
+		{ sql: "DELETE FROM spotify_playlists" },
+		{ sql: "DELETE FROM boards" },
+		{ sql: "DELETE FROM sqlite_sequence" },
+	];
 
-		data.boards.forEach((board) => {
-			insertBoard.run(
+	snapshot.boards.forEach((board) => {
+		stmts.push({
+			sql: "INSERT INTO boards (id, name, created_at) VALUES (?, ?, ?)",
+			args: [
 				asNumber(board.id, "boards.id"),
 				asString(board.name, "boards.name"),
 				asOptionalString(board.created_at),
-			);
+			],
 		});
+	});
 
-		data.tasks.forEach((task) => {
-			insertTask.run(
+	snapshot.tasks.forEach((task) => {
+		stmts.push({
+			sql: "INSERT INTO tasks (id, board_id, text, tag, priority, due, estimate, status, git_link, position, created_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			args: [
 				asNumber(task.id, "tasks.id"),
 				asNumber(task.board_id, "tasks.board_id"),
 				asString(task.text, "tasks.text"),
@@ -198,51 +181,66 @@ export function importBackup(input: unknown) {
 				asOptionalNumber(task.position, "tasks.position") ?? 0,
 				asOptionalString(task.created_at),
 				asOptionalString(task.completed_at),
-			);
+			],
 		});
+	});
 
-		data.subtasks.forEach((subtask) => {
-			insertSubtask.run(
+	snapshot.subtasks.forEach((subtask) => {
+		stmts.push({
+			sql: "INSERT INTO subtasks (id, task_id, text, done) VALUES (?, ?, ?, ?)",
+			args: [
 				asNumber(subtask.id, "subtasks.id"),
 				asNumber(subtask.task_id, "subtasks.task_id"),
 				asString(subtask.text, "subtasks.text"),
 				asBooleanish(subtask.done, "subtasks.done") ? 1 : 0,
-			);
+			],
 		});
+	});
 
-		data.notes.forEach((note) => {
-			insertNote.run(
+	snapshot.notes.forEach((note) => {
+		stmts.push({
+			sql: "INSERT INTO notes (board_id, content) VALUES (?, ?)",
+			args: [
 				asNumber(note.board_id, "notes.board_id"),
 				asString(note.content, "notes.content"),
-			);
+			],
 		});
+	});
 
-		data.pomodoroSessions.forEach((session) => {
-			insertPomodoro.run(
+	snapshot.pomodoroSessions.forEach((session) => {
+		stmts.push({
+			sql: "INSERT INTO pomodoro_sessions (id, type, duration_seconds, completed_at) VALUES (?, ?, ?, ?)",
+			args: [
 				asNumber(session.id, "pomodoroSessions.id"),
 				asString(session.type, "pomodoroSessions.type"),
 				asNumber(session.duration_seconds, "pomodoroSessions.duration_seconds"),
 				asOptionalString(session.completed_at),
-			);
+			],
 		});
+	});
 
-		data.settings.forEach((setting) => {
-			insertSetting.run(
+	snapshot.settings.forEach((setting) => {
+		stmts.push({
+			sql: "INSERT INTO settings (key, value) VALUES (?, ?)",
+			args: [
 				asString(setting.key, "settings.key"),
 				asOptionalString(setting.value),
-			);
+			],
 		});
+	});
 
-		data.spotifyPlaylists.forEach((playlist) => {
-			insertPlaylist.run(
+	snapshot.spotifyPlaylists.forEach((playlist) => {
+		stmts.push({
+			sql: "INSERT INTO spotify_playlists (id, name, link, is_active, created_at) VALUES (?, ?, ?, ?, ?)",
+			args: [
 				asNumber(playlist.id, "spotifyPlaylists.id"),
 				asString(playlist.name, "spotifyPlaylists.name"),
 				asString(playlist.link, "spotifyPlaylists.link"),
 				asOptionalNumber(playlist.is_active, "spotifyPlaylists.is_active") ?? 0,
 				asOptionalString(playlist.created_at),
-			);
+			],
 		});
 	});
 
-	txn(snapshot);
+	await batch(stmts);
 }
