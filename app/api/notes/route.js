@@ -7,19 +7,22 @@ export async function GET(req) {
 	await initDb();
 	const { searchParams } = new URL(req.url);
 	const boardId = searchParams.get("boardId");
-	const [row] = await query("SELECT * FROM notes WHERE board_id = ?", [
-		boardId,
-	]);
-	return NextResponse.json(row || { board_id: Number(boardId), content: "" });
+	const rows = await query(
+		"SELECT * FROM notes WHERE board_id = ? ORDER BY created_at ASC",
+		[boardId],
+	);
+	return NextResponse.json(rows);
 }
 
-export async function PUT(req) {
+export async function POST(req) {
 	await initDb();
-	const { boardId, content } = await req.json();
-	await run(
-		`INSERT INTO notes (board_id, content) VALUES (?, ?)
-     ON CONFLICT(board_id) DO UPDATE SET content = excluded.content`,
-		[boardId, content],
+	const { boardId, title, content } = await req.json();
+	const r = await run(
+		`INSERT INTO notes (board_id, title, content) VALUES (?, ?, ?)`,
+		[boardId, title || "Untitled", content || ""],
 	);
-	return NextResponse.json({ ok: true });
+	const [row] = await query("SELECT * FROM notes WHERE id = ?", [
+		r.lastInsertRowid,
+	]);
+	return NextResponse.json(row);
 }

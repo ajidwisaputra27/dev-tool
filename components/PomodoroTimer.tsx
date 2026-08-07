@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import StatsHeatmap from "./StatsHeatmap";
-import WorldClocks from "./WorldClocks";
 import type { PomodoroSession } from "@/types";
 
 const DURATIONS: Record<"work" | "break", number> = {
@@ -189,7 +188,6 @@ export default function PomodoroTimer({
 				</div>
 			</div>
 			<StatsHeatmap sessions={sessions} />
-			<WorldClocks />
 		</div>
 	);
 }

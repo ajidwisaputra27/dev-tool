@@ -46,8 +46,12 @@ export async function initDb() {
     );
 
     CREATE TABLE IF NOT EXISTS notes (
-      board_id INTEGER PRIMARY KEY,
-      content TEXT DEFAULT ''
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      board_id INTEGER NOT NULL,
+      title TEXT DEFAULT 'Untitled',
+      content TEXT DEFAULT '',
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS pomodoro_sessions (
@@ -76,8 +80,8 @@ export async function initDb() {
 	if (Number(boards.rows[0].c) === 0) {
 		const r = await db.execute("INSERT INTO boards (name) VALUES ('main')");
 		await db.execute({
-			sql: "INSERT INTO notes (board_id, content) VALUES (?, ?)",
-			args: [r.lastInsertRowid!, ""],
+			sql: "INSERT INTO notes (board_id, title, content) VALUES (?, ?, ?)",
+			args: [r.lastInsertRowid!, "scratch.md", ""],
 		});
 	}
 }

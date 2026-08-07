@@ -199,10 +199,13 @@ export async function importBackup(input: unknown) {
 
 	snapshot.notes.forEach((note) => {
 		stmts.push({
-			sql: "INSERT INTO notes (board_id, content) VALUES (?, ?)",
+			sql: "INSERT INTO notes (id, board_id, title, content, created_at) VALUES (?, ?, ?, ?, ?)",
 			args: [
+				asNumber(note.id, "notes.id"),
 				asNumber(note.board_id, "notes.board_id"),
+				asOptionalString(note.title) ?? "Untitled",
 				asString(note.content, "notes.content"),
+				asOptionalString(note.created_at),
 			],
 		});
 	});

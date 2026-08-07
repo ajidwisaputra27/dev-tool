@@ -9,13 +9,14 @@ import type {
 	SpotifyPlaylist,
 	Task,
 	TaskStatus,
+	Note,
 } from "@/types";
 import KanbanBoard from "./KanbanBoard";
 import SpotifyPanel from "./SpotifyPanel";
-import PomodoroTimer from "./PomodoroTimer";
 import Scratchpad from "./Scratchpad";
 import DataManager from "./DataManager";
 import CommandPalette from "./CommandPalette";
+import WorldClocks from "./WorldClocks";
 
 const THEMES = ["ink", "dracula", "monokai", "solarized"] as const;
 
@@ -271,7 +272,7 @@ export default function Dashboard() {
 	const [boards, setBoards] = useState<Board[]>([]);
 	const [currentBoardId, setCurrentBoardId] = useState<number | null>(null);
 	const [tasks, setTasks] = useState<Task[]>([]);
-	const [notesContent, setNotesContent] = useState("");
+	const [notes, setNotes] = useState<Note[]>([]);
 	const [settings, setSettings] = useState<SettingsMap>({});
 	const [sessions, setSessions] = useState<PomodoroSession[]>([]);
 	const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
@@ -345,12 +346,12 @@ export default function Dashboard() {
 			fetch(`/api/tasks?boardId=${boardId}`).then((r) => r.json()) as Promise<
 				Task[]
 			>,
-			fetch(`/api/notes?boardId=${boardId}`).then((r) => r.json()) as Promise<{
-				content?: string;
-			}>,
+			fetch(`/api/notes?boardId=${boardId}`).then((r) => r.json()) as Promise<
+				Note[]
+			>,
 		]);
 		setTasks(tasksRes);
-		setNotesContent(notesRes.content || "");
+		setNotes(notesRes);
 	}, []);
 
 	useEffect(() => {
@@ -557,12 +558,41 @@ export default function Dashboard() {
 		await fetch(`/api/subtasks/${subtaskId}`, { method: "DELETE" });
 	}
 
-	function saveNotes(content: string) {
-		if (!currentBoardId) return;
-		void fetch("/api/notes", {
-			method: "PUT",
+	function saveNotes(id: number, content: string) {
+		setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, content } : n)));
+		void fetch(`/api/notes/${id}`, {
+			method: "PATCH",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ boardId: currentBoardId, content }),
+			body: JSON.stringify({ content }),
+		});
+	}
+
+	async function addNote() {
+		if (!currentBoardId) return;
+		const res = await fetch("/api/notes", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				boardId: currentBoardId,
+				title: "new.md",
+				content: "",
+			}),
+		});
+		const note = await res.json();
+		setNotes((prev) => [...prev, note]);
+	}
+
+	async function deleteNote(id: number) {
+		setNotes((prev) => prev.filter((n) => n.id !== id));
+		await fetch(`/api/notes/${id}`, { method: "DELETE" });
+	}
+
+	async function renameNote(id: number, title: string) {
+		setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, title } : n)));
+		await fetch(`/api/notes/${id}`, {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ title }),
 		});
 	}
 
@@ -700,25 +730,59 @@ export default function Dashboard() {
 				</div>
 				<div className="status">
 					<DataManager onImported={loadEverything} />
-					<select
-						className="theme-select"
-						value={theme}
-						onChange={(e) => {
-							const nextTheme = e.target.value as Theme;
-							if ((THEMES as readonly string[]).includes(nextTheme))
-								changeTheme(nextTheme);
-						}}
+					<div className="theme-dropdown-wrap" style={{ position: "relative" }}>
+						<button className="icon-btn" title="Change Theme">
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+							>
+								<circle cx="12" cy="12" r="5"></circle>
+								<line x1="12" y1="1" x2="12" y2="3"></line>
+								<line x1="12" y1="21" x2="12" y2="23"></line>
+								<line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+								<line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+								<line x1="1" y1="12" x2="3" y2="12"></line>
+								<line x1="21" y1="12" x2="23" y2="12"></line>
+								<line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+								<line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+							</svg>
+						</button>
+						<select
+							className="theme-select-hidden"
+							value={theme}
+							onChange={(e) => {
+								const nextTheme = e.target.value as Theme;
+								if ((THEMES as readonly string[]).includes(nextTheme))
+									changeTheme(nextTheme);
+							}}
+							title="Change Theme"
+						>
+							{THEMES.map((t) => (
+								<option key={t} value={t}>
+									{t}
+								</option>
+							))}
+						</select>
+					</div>
+					<button
+						className="icon-btn"
+						onClick={() => setPaletteOpen(true)}
+						title="Command Palette"
 					>
-						{THEMES.map((t) => (
-							<option key={t} value={t}>
-								{t}
-							</option>
-						))}
-					</select>
-					<button className="icon-btn" onClick={() => setPaletteOpen(true)}>
 						⌘k
 					</button>
-					<span className="clock">{clock}</span>
+					<div className="clock-wrap">
+						<span className="clock">{clock}</span>
+						<div className="clock-hover-popup">
+							<WorldClocks />
+						</div>
+					</div>
 				</div>
 			</div>
 
@@ -840,11 +904,13 @@ export default function Dashboard() {
 						onSelectPlaylist={selectSpotifyPlaylist}
 						onSaveLink={saveSpotifyLink}
 					/>
-					<PomodoroTimer
-						sessions={sessions}
-						onSessionComplete={logPomodoroSession}
+					<Scratchpad
+						notes={notes}
+						onSave={saveNotes}
+						onAdd={addNote}
+						onDelete={deleteNote}
+						onRename={renameNote}
 					/>
-					<Scratchpad initialContent={notesContent} onSave={saveNotes} />
 				</div>
 			</div>
 
